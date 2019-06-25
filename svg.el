@@ -1,28 +1,30 @@
-;;; svg.el --- svg image creation functions
+;;; svg.el --- SVG image creation functions -*- lexical-binding: t -*-
 
-;; Copyright (C) 2014 Free Software Foundation, Inc.
+;; Copyright (C) 2014-2019 Free Software Foundation, Inc.
 
-;; Maintainer: Lars Magne Ingebrigtsen <larsi@gnus.org>
+;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: image
-;; Version: 0.2
+;; Version: 1.0
 ;; Package-Requires: ((emacs "25"))
 
-;; This program is free software: you can redistribute it and/or modify
+;; This file is part of GNU Emacs.
+
+;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
 
-;; This program is distributed in the hope that it will be useful,
+;; GNU Emacs is distributed in the hope that it will be useful,
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
-;; This pacakge allows creating SVG images in Emacs.  SVG images are
+;; This package allows creating SVG images in Emacs.  SVG images are
 ;; vector-based XML files, really, so you could create them directly
 ;; as XML.  However, that's really tedious, as there are some fiddly
 ;; bits.
@@ -36,19 +38,21 @@
 
 ;; Create the base image structure, add a gradient spec, and insert it
 ;; into the buffer:
-;; (setq svg (svg-create 800 800 :stroke "orange" :stroke-width 5))
-;; (svg-gradient svg "gradient" 'linear '(0 . "red") '(100 . "blue"))
-;; (save-excursion (goto-char (point-max)) (svg-insert-image svg))
+;;
+;;     (setq svg (svg-create 800 800 :stroke "orange" :stroke-width 5))
+;;     (svg-gradient svg "gradient" 'linear '(0 . "red") '(100 . "blue"))
+;;     (save-excursion (goto-char (point-max)) (svg-insert-image svg))
 
 ;; Then add various elements to the structure:
-;; (svg-rectangle svg 100 100 500 500 :gradient "gradient" :id "rec1")
-;; (svg-circle svg 500 500 100 :id "circle1")
-;; (svg-ellipse svg 100 100 50 90 :stroke "red" :id "ellipse1")
-;; (svg-line svg 100 190 50 100 :id "line1" :stroke "yellow")
-;; (svg-polyline svg '((200 . 100) (500 . 450) (80 . 100))
-;; 	      :stroke "green" :id "poly1")
-;; (svg-polygon svg '((100 . 100) (200 . 150) (150 . 90))
-;; 	     :stroke "blue" :fill "red" :id "gon1")
+;;
+;;     (svg-rectangle svg 100 100 500 500 :gradient "gradient" :id "rec1")
+;;     (svg-circle svg 500 500 100 :id "circle1")
+;;     (svg-ellipse svg 100 100 50 90 :stroke "red" :id "ellipse1")
+;;     (svg-line svg 100 190 50 100 :id "line1" :stroke "yellow")
+;;     (svg-polyline svg '((200 . 100) (500 . 450) (80 . 100))
+;;                   :stroke "green" :id "poly1")
+;;     (svg-polygon svg '((100 . 100) (200 . 150) (150 . 90))
+;;                  :stroke "blue" :fill "red" :id "gon1")
 
 ;;; Code:
 
@@ -57,7 +61,7 @@
 (require 'dom)
 
 (defun svg-create (width height &rest args)
-  "Create a new, empty SVG image with dimentions WIDTHxHEIGHT.
+  "Create a new, empty SVG image with dimensions WIDTH x HEIGHT.
 ARGS can be used to provide `stroke' and `stroke-width' parameters to
 any further elements added."
   (dom-node 'svg
@@ -65,13 +69,13 @@ any further elements added."
 	      (height . ,height)
 	      (version . "1.1")
 	      (xmlns . "http://www.w3.org/2000/svg")
-	      ,@(svg-arguments nil args))))
+	      ,@(svg--arguments nil args))))
 
-(defun svg-gradient (svg id type &rest stops)
+(defun svg-gradient (svg id type stops)
   "Add a gradient with ID to SVG.
-TYPE is `linear' or `gradient'.  STOPS is a list of percentage/color
-pairs."
-  (svg-def
+TYPE is `linear' or `radial'.
+STOPS is a list of percentage/color pairs."
+  (svg--def
    svg
    (apply
     'dom-node
@@ -90,54 +94,59 @@ pairs."
      stops))))
 
 (defun svg-rectangle (svg x y width height &rest args)
-  "Create a rectangle on SVG."
-  (svg-append
+  "Create a rectangle on SVG, starting at position X/Y, of WIDTH/HEIGHT.
+ARGS is a plist of modifiers.  Possible values are
+
+:stroke-width PIXELS   The line width.
+:stroke-color COLOR    The line color.
+:gradient ID           The gradient ID to use."
+  (svg--append
    svg
    (dom-node 'rect
 	     `((width . ,width)
 	       (height . ,height)
 	       (x . ,x)
 	       (y . ,y)
-	       ,@(svg-arguments svg args)))))
+	       ,@(svg--arguments svg args)))))
 
 (defun svg-circle (svg x y radius &rest args)
   "Create a circle of RADIUS on SVG.
 X/Y denote the center of the circle."
-  (svg-append
+  (svg--append
    svg
    (dom-node 'circle
 	     `((cx . ,x)
 	       (cy . ,y)
 	       (r . ,radius)
-	       ,@(svg-arguments svg args)))))
+	       ,@(svg--arguments svg args)))))
 
 (defun svg-ellipse (svg x y x-radius y-radius &rest args)
   "Create an ellipse of X-RADIUS/Y-RADIUS on SVG.
 X/Y denote the center of the ellipse."
-  (svg-append
+  (svg--append
    svg
    (dom-node 'ellipse
 	     `((cx . ,x)
 	       (cy . ,y)
 	       (rx . ,x-radius)
 	       (ry . ,y-radius)
-	       ,@(svg-arguments svg args)))))
+	       ,@(svg--arguments svg args)))))
 
 (defun svg-line (svg x1 y1 x2 y2 &rest args)
-  "Create a line of starting in X1/Y1, ending at X2/Y2 on SVG."
-  (svg-append
+  "Create a line starting in X1/Y1, ending at X2/Y2 on SVG."
+  (svg--append
    svg
    (dom-node 'line
 	     `((x1 . ,x1)
-	       (y1 . ,y1)
 	       (x2 . ,x2)
+	       (y1 . ,y1)
 	       (y2 . ,y2)
-	       ,@(svg-arguments svg args)))))
+	       ,@(svg--arguments svg args)))))
 
 (defun svg-polyline (svg points &rest args)
   "Create a polyline going through POINTS on SVG.
 POINTS is a list of x/y pairs."
-  (svg-append
+  (svg--append
    svg
    (dom-node
     'polyline
@@ -145,12 +154,12 @@ POINTS is a list of x/y pairs."
 			      (format "%s %s" (car pair) (cdr pair)))
 			    points
 			    ", "))
-      ,@(svg-arguments svg args)))))
+      ,@(svg--arguments svg args)))))
 
 (defun svg-polygon (svg points &rest args)
   "Create a polygon going through POINTS on SVG.
 POINTS is a list of x/y pairs."
-  (svg-append
+  (svg--append
    svg
    (dom-node
     'polygon
@@ -158,27 +167,86 @@ POINTS is a list of x/y pairs."
 			      (format "%s %s" (car pair) (cdr pair)))
 			    points
 			    ", "))
-      ,@(svg-arguments svg args)))))
+      ,@(svg--arguments svg args)))))
 
-(defun svg-append (svg node)
+(defun svg-embed (svg image image-type datap &rest args)
+  "Insert IMAGE into the SVG structure.
+IMAGE should be a file name if DATAP is nil, and a binary string
+otherwise.  IMAGE-TYPE should be a MIME image type, like
+\"image/jpeg\" or the like."
+  (svg--append
+   svg
+   (dom-node
+    'image
+    `((xlink:href . ,(svg--image-data image image-type datap))
+      ,@(svg--arguments svg args)))))
+
+(defun svg-text (svg text &rest args)
+  "Add TEXT to SVG."
+  (svg--append
+   svg
+   (dom-node
+    'text
+    `(,@(svg--arguments svg args))
+    (svg--encode-text text))))
+
+(defun svg--encode-text (text)
+  ;; Apparently the SVG renderer needs to have all non-ASCII
+  ;; characters encoded, and only certain special characters.
+  (with-temp-buffer
+    (insert text)
+    (dolist (substitution '(("&" . "&amp;")
+			    ("<" . "&lt;")
+			    (">" . "&gt;")))
+      (goto-char (point-min))
+      (while (search-forward (car substitution) nil t)
+	(replace-match (cdr substitution) t t nil)))
+    (goto-char (point-min))
+    (while (not (eobp))
+      (let ((char (following-char)))
+        (if (< char 128)
+            (forward-char 1)
+          (delete-char 1)
+          (insert "&#" (format "%d" char) ";"))))
+    (buffer-string)))
+
+(defun svg--append (svg node)
   (let ((old (and (dom-attr node 'id)
-		  (dom-by-id svg (concat "\\`" (regexp-quote (dom-attr node 'id))
-					 "\\'")))))
+		  (dom-by-id svg
+                             (concat "\\`" (regexp-quote (dom-attr node 'id))
+                                     "\\'")))))
     (if old
-	(dom-set-attributes old (dom-attributes node))
+        ;; FIXME: This was (dom-set-attributes old (dom-attributes node))
+        ;; and got changed by commit f7ea7aa11f6211b5142bbcfc41c580d75485ca56
+        ;; without any explanation.
+	(setcdr (car old) (cdr node))
       (dom-append-child svg node)))
   (svg-possibly-update-image svg))
 
-(defun svg-arguments (svg args)
+(defun svg--image-data (image image-type datap)
+  (with-temp-buffer
+    (set-buffer-multibyte nil)
+    (if datap
+        (insert image)
+      (insert-file-contents image))
+    (base64-encode-region (point-min) (point-max) t)
+    (goto-char (point-min))
+    (insert "data:" image-type ";base64,")
+    (buffer-string)))
+
+(defun svg--arguments (svg args)
   (let ((stroke-width (or (plist-get args :stroke-width)
 			  (dom-attr svg 'stroke-width)))
-	(stroke (or (plist-get args :stroke)
-		    (dom-attr svg 'stroke)))
+	(stroke-color (or (plist-get args :stroke-color)
+                          (dom-attr svg 'stroke-color)))
+        (fill-color (plist-get args :fill-color))
 	attr)
     (when stroke-width
       (push (cons 'stroke-width stroke-width) attr))
-    (when stroke
-      (push (cons 'stroke stroke) attr))
+    (when stroke-color
+      (push (cons 'stroke stroke-color) attr))
+    (when fill-color
+      (push (cons 'fill fill-color) attr))
     (when (plist-get args :gradient)
       (setq attr
 	    (append
@@ -191,14 +259,15 @@ POINTS is a list of x/y pairs."
 				(plist-get args :gradient))))
 	     attr)))
     (cl-loop for (key value) on args by #'cddr
-	     unless (memq key '(:stroke :stroke-width :gradient))
+	     unless (memq key '(:stroke-color :stroke-width :gradient
+                                              :fill-color))
 	     ;; Drop the leading colon.
 	     do (push (cons (intern (substring (symbol-name key) 1) obarray)
 			    value)
 		      attr))
     attr))
 
-(defun svg-def (svg def)
+(defun svg--def (svg def)
   (dom-append-child
    (or (dom-by-tag svg 'defs)
        (let ((node (dom-node 'defs)))
@@ -207,13 +276,15 @@ POINTS is a list of x/y pairs."
    def)
   svg)
 
-(defun svg-image (svg)
-  "Return an image object from SVG."
-  (create-image
+(defun svg-image (svg &rest props)
+  "Return an image object from SVG.
+PROPS is passed on to `create-image' as its PROPS list."
+  (apply
+   #'create-image
    (with-temp-buffer
      (svg-print svg)
      (buffer-string))
-   'svg t))
+   'svg t props))
 
 (defun svg-insert-image (svg)
   "Insert SVG as an image at point.
@@ -232,16 +303,26 @@ If the SVG is later changed, the image will also be updated."
 
 (defun svg-print (dom)
   "Convert DOM into a string containing the xml representation."
-  (insert (format "<%s" (car dom)))
-  (dolist (attr (nth 1 dom))
-    ;; Ignore attributes that start with a colon.
-    (unless (= (aref (format "%s" (car attr)) 0) ?:)
-      (insert (format " %s=\"%s\"" (car attr) (cdr attr)))))
-  (insert ">")
-  (dolist (elem (nthcdr 2 dom))
-    (insert " ")
-    (svg-print elem))
-  (insert (format "</%s>" (car dom))))
+  (if (stringp dom)
+      (insert dom)
+    (insert (format "<%s" (car dom)))
+    (dolist (attr (nth 1 dom))
+      ;; Ignore attributes that start with a colon.
+      (unless (= (aref (format "%s" (car attr)) 0) ?:)
+        (insert (format " %s=\"%s\"" (car attr) (cdr attr)))))
+    (insert ">")
+    (dolist (elem (nthcdr 2 dom))
+      (insert " ")
+      (svg-print elem))
+    (insert (format "</%s>" (car dom)))))
+
+(defun svg-remove (svg id)
+  "Remove the element identified by ID from SVG."
+  (let* ((node (car (dom-by-id
+                     svg
+                     (concat "\\`" (regexp-quote id)
+                             "\\'")))))
+    (when node (dom-remove-node svg node))))
 
 (provide 'svg)
 
